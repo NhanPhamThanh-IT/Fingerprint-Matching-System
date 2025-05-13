@@ -254,7 +254,7 @@ def identify_fingerprint(input_img, dataset_images, model, input_size, threshold
     try:
         input_processed = preprocess_image(input_img, input_size)
         if input_processed is None:
-            return None, None, None
+            return None, None, None, None
         input_features = model.predict(input_processed)
 
         similarities = []
@@ -272,7 +272,7 @@ def identify_fingerprint(input_img, dataset_images, model, input_size, threshold
             similarities.append((person_name, similarity, filename))
 
         if not similarities:
-            return None, None, None
+            return None, None, None, None
 
         # Find the highest similarity score
         max_similarity = max(similarity for _, similarity, _ in similarities)
@@ -284,18 +284,23 @@ def identify_fingerprint(input_img, dataset_images, model, input_size, threshold
             if similarity == max_similarity
         ]
 
-        # Check if the highest similarity is above the threshold
+        # Return all similarities and matched files if above threshold
         if max_similarity >= threshold:
-            return best_matches, max_similarity, [filename for _, _, filename in best_matches]
+            matched_files = [filename for _, _, filename in best_matches]
+            return best_matches, max_similarity, matched_files, similarities
         else:
-            return None, max_similarity, None
+            return None, max_similarity, None, similarities
 
     except Exception as e:
         st.error(f"Error during fingerprint identification: {str(e)}")
-        return None, None, None
+        return None, None, None, None
 
 # Streamlit app
 st.title("Fingerprint Identification Application")
+
+# Initialize session state for file uploader key
+if 'uploader_key' not in st.session_state:
+    st.session_state['uploader_key'] = 'dataset_imgs'
 
 # Model selection
 model_name = st.selectbox("Select Model", list(MODEL_PATHS.keys()))
@@ -304,16 +309,21 @@ model_path = model_info["path"]
 input_size = model_info["input_size"]
 
 st.write(f"Using model: {model_name}")
-st.write(f"Expected input size: {input_size}")
-st.write("Similarity Threshold: 0.8")
 
 # File uploaders
 input_img_file = st.file_uploader("Upload Fingerprint Image to Identify", type=['bmp', 'png', 'jpg', 'jpeg'], key="input_img")
-dataset_img_files = st.file_uploader("Upload Dataset Fingerprint Images", type=['bmp', 'png', 'jpg', 'jpeg'], accept_multiple_files=True, key="dataset_imgs")
+dataset_img_files = st.file_uploader(
+    "Upload Dataset Fingerprint Images",
+    type=['bmp', 'png', 'jpg', 'jpeg'],
+    accept_multiple_files=True,
+    key=st.session_state['uploader_key']
+)
 
 # Clear dataset button
 if st.button("Clear Dataset"):
-    # Safely clear dataset-related session state keys
+    # Change the uploader key to force a reset
+    st.session_state['uploader_key'] = f"dataset_imgs_{np.random.randint(10000)}"
+    # Clear any related session state data
     if "dataset_imgs" in st.session_state:
         del st.session_state["dataset_imgs"]
     if "dataset_files" in st.session_state:
@@ -361,31 +371,59 @@ if input_img_file and dataset_img_files:
         model = load_model(model_path, model_name)
         if model:
             with st.spinner("Identifying fingerprint..."):
-                best_matches, max_similarity, matched_files = identify_fingerprint(input_img, dataset_images, model, input_size)
+                best_matches, max_similarity, matched_files, similarities = identify_fingerprint(
+                    input_img, dataset_images, model, input_size
+                )
+                st.subheader("Identification Results")
+                st.write(f"Model: {model_name}")
+                st.write(f"Similarity Score: {max_similarity:.4f}")
+
+                # Display matched images if successful
                 if best_matches:
-                    st.subheader("Identification Results")
-                    st.write(f"Model: {model_name}")
-                    st.write(f"Similarity Score: {max_similarity:.4f}")
-                    
-                    # Display all matched persons and images
-                    matched_persons = list(set(person for person, _, _ in best_matches))
                     st.write("Matched Image(s):")
-                    
-                    # Display all matched images in a grid with similarity scores
                     cols_per_row = 5
-                    cols = st.columns(min(len(matched_files), cols_per_row))
-                    for idx, filename in enumerate(matched_files):
-                        matched_img = next(img for img, fname in dataset_images if fname == filename)
-                        # Find the similarity score for this specific filename
-                        similarity_score = next(similarity for _, similarity, fname in best_matches if fname == filename)
-                        with cols[idx % cols_per_row]:
-                            st.image(matched_img, caption=f"{filename} (Similarity: {similarity_score:.4f})", width=120)
-                    
+                    num_images = len(matched_files)
+                    num_rows = (num_images + cols_per_row - 1) // cols_per_row
+
+                    for row in range(num_rows):
+                        cols = st.columns(cols_per_row)
+                        for col_idx, col in enumerate(cols):
+                            img_idx = row * cols_per_row + col_idx
+                            if img_idx < num_images:
+                                filename = matched_files[img_idx]
+                                matched_img = next(img for img, fname in dataset_images if fname == filename)
+                                similarity_score = next(
+                                    similarity for _, similarity, fname in best_matches if fname == filename
+                                )
+                                with col:
+                                    st.image(
+                                        matched_img,
+                                        caption=f"{filename} (Similarity: {similarity_score:.4f})",
+                                        width=120
+                                    )
                 else:
-                    st.subheader("Identification Results")
-                    st.write(f"Highest Similarity Score: {max_similarity:.4f}")
-                    st.write("Threshold: 0.8")
-                    st.error("No match found. Similarity score is below the threshold.")
+                    st.error("No match found.")
+
+                # Always display all dataset images with similarity scores
+                if similarities:
+                    st.write("All Dataset Images with Similarity Scores:")
+                    cols_per_row = 5
+                    num_images = len(similarities)
+                    num_rows = (num_images + cols_per_row - 1) // cols_per_row
+
+                    for row in range(num_rows):
+                        cols = st.columns(cols_per_row)
+                        for col_idx, col in enumerate(cols):
+                            img_idx = row * cols_per_row + col_idx
+                            if img_idx < num_images:
+                                _, similarity, filename = similarities[img_idx]
+                                img = next(img for img, fname in dataset_images if fname == filename)
+                                with col:
+                                    st.image(
+                                        img,
+                                        caption=f"{filename} (Similarity: {similarity:.4f})",
+                                        width=120
+                                    )
 
 st.markdown("""
 ### Instructions
@@ -394,6 +432,6 @@ st.markdown("""
 3. Upload multiple fingerprint images as the dataset (named as `person_name_imageX.ext` or `person_name.ext`).
 4. Click "Clear Dataset" to remove all uploaded dataset images.
 5. Click "Identify Fingerprint" to see the identification results.
-6. If the highest similarity score is above the threshold (0.8), the app will show all images with that score and the corresponding person(s).
-7. If below the threshold, it will indicate no match was found.
+6. If the highest similarity score is above the threshold (0.8), the app will show matched images under "Matched Image(s):" and all dataset images with their similarity scores.
+7. If below the threshold, it will show all dataset images with their similarity scores.
 """)
