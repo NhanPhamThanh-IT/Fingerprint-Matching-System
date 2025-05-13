@@ -173,19 +173,7 @@ class SelfAttentionLayer(Layer):
 # MODEL_PATHS dictionary
 MODEL_PATHS = {
     "MobileNet+SENet": {"path": r"mobilenet_plus+Snet.h5", "input_size": (224, 224)},
-    "EfficientNetB0+SENet": {"path": r"efficientnet_b0_plus+Snet.h5", "input_size": (224, 224)},
     "MobileNet+SelfAttention": {"path": r"mobilenet_plus+Self-Attention.h5", "input_size": (224, 224)},
-    "EfficientNetB0+SelfAttention": {"path": r"efficientnet_b0_plus+Self-Attention.h5", "input_size": (224, 224)},
-    "MobileNet+DualAttention": {"path": r"mobilenet_plus+dual.h5", "input_size": (224, 224)},
-    "EfficientNetB0+DualAttention": {"path": r"mobilenet_plus+dual.h5", "input_size": (224, 224)},
-    "MobileNet+CBAM": {"path": r"mobilenet_plus+CBAM.keras", "input_size": (224, 224)},
-    "EfficientNetB0+CBAM": {"path": r"efficientnet_b0_plus+CBAM.keras", "input_size": (224, 224)},
-    "VGG16+Inversion": {"path": r"VGG16_Inversion.h5", "input_size": (160, 160)},
-    "VGG16+MultiAugmentation": {"path": r"VGG16_Multi_Augmentation.h5", "input_size": (160, 160)},
-    "VGG16+Normal": {"path": r"VGG16_Normal.h5", "input_size": (160, 160)},
-    "VGG19+Inversion": {"path": r"VGG19_Inversion.h5", "input_size": (160, 160)},
-    "VGG19+MultiAugmentation": {"path": r"VGG19_Multi_Augmentation.h5", "input_size": (160, 160)},
-    "VGG19+Normal": {"path": r"VGG19_Normal.h5", "input_size": (160, 160)},
 }
 
 def preprocess_image(image, input_size=(224, 224)):
